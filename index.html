@@ -176,7 +176,7 @@
     .row {
       display: flex;
       gap: 8px;
-      margin: 12px 0 4px;
+      margin: 0px 0 4px;
 
       align-items: center;
     }
@@ -187,6 +187,36 @@
 
     .section {
       width: 400px;
+    }
+
+    .toggle-group {
+      display: flex;
+      gap: 4px;
+      padding: 4px;
+      border: 1px solid var(--border);
+      border-radius: 5px;
+      background: var(--surface);
+    }
+
+    .toggle-group button {
+      flex: 1;
+      padding: 7px 10px;
+      border: 0;
+      border-radius: 3px;
+      background: transparent;
+      color: var(--muted);
+      cursor: pointer;
+      font-weight: 700;
+    }
+
+    .toggle-group button.active {
+      background: var(--primary);
+      color: #111111;
+      box-shadow: 0 0 12px var(--glow);
+    }
+
+    [hidden] {
+      display: none !important;
     }
 
     .container {
@@ -338,24 +368,34 @@
 <body>
   <header class="header">
     <h1>STREAM2PLAYER ♫</h1>
-    <button id="mute" class="secondary" title="Mute music">||</button>
+    <button id="mute" class="secondary" title="Mute" aria-label="Mute">▷</button>
   </header>
   <div class="container">
     <section class="section">
-      <label>PLAYLIST_ID</label>
-      <input id="playlistId" placeholder="e.g. 3pdwsDnzLp6Uks4dUutxp8" />
+      <label>DOWNLOAD FROM</label>
+      <div class="toggle-group" role="group" aria-label="Download source">
+        <button id="spotifySource" class="active" type="button" aria-pressed="true">Spotify</button>
+        <button id="youtubeSource" type="button" aria-pressed="false">YouTube</button>
+      </div>
 
-      <label>CLIENT_ID</label>
-      <input id="clientId" />
+      <label id="sourceInputLabel">PLAYLIST OR TRACK ID / URL</label>
+      <input id="sourceInput" placeholder="e.g. Spotify playlist or track ID / URL" />
 
-      <label>CLIENT_SECRET</label>
-      <input id="clientSecret" type="password" />
+      <div id="spotifyOptions">
+        <label>CLIENT_ID</label>
+        <input id="clientId" />
+
+        <label>CLIENT_SECRET</label>
+        <input id="clientSecret" type="password" />
+      </div>
 
       <label>DOWNLOAD FOLDER</label>
       <div class="row">
         <input id="downloadDir" placeholder="No folder selected" readonly />
         <button id="choose" class="secondary">Choose</button>
       </div>
+
+      <div style="margin-top: 12px"></div>
 
       <div class="row">
         <button id="start" class="primary">Start</button>
@@ -371,6 +411,22 @@
   <script>
     const $ = (id) => document.getElementById(id);
     const logEl = $('log');
+    let source = 'spotify';
+
+    function resizeWindowToContent() {
+      const contentBottom = Array.from(document.body.children).reduce(
+        (bottom, element) => Math.max(bottom, element.getBoundingClientRect().bottom),
+        0,
+      );
+      const bodyStyle = getComputedStyle(document.body);
+      const height = contentBottom + parseFloat(bodyStyle.paddingBottom || '0');
+      window.api.resizeWindow(height);
+    }
+
+    function scheduleWindowResize() {
+      requestAnimationFrame(resizeWindowToContent);
+      setTimeout(resizeWindowToContent, 100);
+    }
 
     function addLog(line) {
       logEl.textContent += line + '\n';
@@ -402,10 +458,57 @@
 
     $('mute').onclick = () => {
       bgm.muted = !bgm.muted;
-      $('mute').textContent = bgm.muted ? '▷' : '||';
+      $('mute').textContent = bgm.muted ? '||' : '▷';
       $('mute').classList.toggle('off', bgm.muted);
-      $('mute').title = bgm.muted ? 'Unmute music' : 'Mute music';
+      $('mute').title = bgm.muted ? 'Unmute' : 'Mute';
+      $('mute').setAttribute('aria-label', $('mute').title);
     };
+
+    function detectInputKind() {
+      const value = $('sourceInput').value.trim();
+      if (!value) return null;
+
+      try {
+        const url = new URL(value);
+        const parts = url.pathname.split('/').filter(Boolean);
+        if (source === 'spotify') {
+          if (parts.includes('playlist')) return 'playlist';
+          if (parts.includes('track')) return 'track';
+        } else if (parts.includes('playlist') && url.searchParams.has('list')) {
+          return 'playlist';
+        } else if (parts.includes('watch') || url.hostname === 'youtu.be') {
+          return 'track';
+        }
+      } catch {
+        // Raw Spotify IDs are resolved by the Spotify API.
+      }
+      return null;
+    }
+
+    function updateInputMode() {
+      const kind = detectInputKind();
+      const kindLabel = kind ? kind.toUpperCase() : 'PLAYLIST OR TRACK';
+      $('sourceInputLabel').textContent = `${kindLabel} ${source === 'spotify' ? 'ID OR URL' : 'URL'}`;
+      $('sourceInput').placeholder = kind
+        ? (source === 'spotify'
+          ? `e.g. ${kind === 'playlist' ? 'Spotify playlist' : 'Spotify track'} ID or URL`
+          : `e.g. https://www.youtube.com/${kind === 'playlist' ? 'playlist?list=...' : 'watch?v=...'}`)
+        : (source === 'spotify'
+          ? 'e.g. Spotify playlist or track ID / URL'
+          : 'e.g. public YouTube playlist or video URL');
+      $('spotifyOptions').hidden = source !== 'spotify';
+      $('spotifySource').classList.toggle('active', source === 'spotify');
+      $('youtubeSource').classList.toggle('active', source === 'youtube');
+      $('spotifySource').setAttribute('aria-pressed', String(source === 'spotify'));
+      $('youtubeSource').setAttribute('aria-pressed', String(source === 'youtube'));
+      scheduleWindowResize();
+    }
+
+    $('spotifySource').onclick = () => { source = 'spotify'; updateInputMode(); };
+    $('youtubeSource').onclick = () => { source = 'youtube'; updateInputMode(); };
+    $('sourceInput').oninput = updateInputMode;
+    window.addEventListener('load', scheduleWindowResize);
+    updateInputMode();
 
     window.api.onLog(addLog);
     window.api.onProgress((p) => {
@@ -431,9 +534,10 @@
       playBgm();
       try {
         await window.api.startDownload({
-          playlistId: $('playlistId').value.trim(),
-          clientId: $('clientId').value.trim(),
-          clientSecret: $('clientSecret').value.trim(),
+          source,
+          input: $('sourceInput').value.trim(),
+          clientId: source === 'spotify' ? $('clientId').value.trim() : undefined,
+          clientSecret: source === 'spotify' ? $('clientSecret').value.trim() : undefined,
           downloadDir: $('downloadDir').value.trim(),
         });
       } finally {

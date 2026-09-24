@@ -100,9 +100,6 @@ const childEnv: NodeJS.ProcessEnv = {
     PATH: [...extraBinDirs, process.env.PATH ?? ''].join(delimiter),
 };
 
-const COOKIES_FROM_BROWSER = '';
-const COOKIES_FILE = '';
-
 export function safeName(input: string): string {
     const cleaned = input
         .replace(/[\\/:*?"<>|]/g, '')
@@ -146,18 +143,19 @@ function spawnP(bin: string, args: string[], log?: Logger, signal?: AbortSignal)
     });
 }
 
-function cookieArgs(): string[] {
-    if (COOKIES_FILE) return ['--cookies', COOKIES_FILE];
-    if (COOKIES_FROM_BROWSER) return ['--cookies-from-browser', COOKIES_FROM_BROWSER];
-    return [];
+export interface YtDlpDownloadOptions {
+    sourceUrl?: string;
 }
 
-export function buildYtDlpArgs(query: string, outputTemplate: string): string[] {
+export function buildYtDlpArgs(
+    query: string,
+    outputTemplate: string,
+    options: YtDlpDownloadOptions = {},
+): string[] {
     const common = [
-        `ytsearch1:${query}`,
+        options.sourceUrl ?? `ytsearch1:${query}`,
         '--output', outputTemplate,
         '--no-playlist',
-        ...cookieArgs(),
     ];
     return [
         ...common,
@@ -167,6 +165,48 @@ export function buildYtDlpArgs(query: string, outputTemplate: string): string[] 
         '--ffmpeg-location',
         toolchainDir,
     ];
+}
+
+export function buildYtDlpMetadataArgs(
+    input: string,
+    isPlaylist: boolean,
+): string[] {
+    return [
+        input,
+        '--dump-single-json',
+        '--skip-download',
+        '--no-warnings',
+        ...(isPlaylist ? ['--flat-playlist'] : ['--no-playlist']),
+    ];
+}
+
+function spawnCapture(bin: string, args: string[], signal?: AbortSignal): Promise<string> {
+    return new Promise((resolve, reject) => {
+        const resolved = resolveToolCommand(bin, { env: childEnv });
+        const child = spawn(resolved.command, [...resolved.args, ...args], {
+            shell: false,
+            env: childEnv,
+            signal,
+        });
+        let stdout = '';
+        let stderr = '';
+        child.stdout?.on('data', (data: Buffer) => { stdout += data.toString(); });
+        child.stderr?.on('data', (data: Buffer) => { stderr += data.toString(); });
+        child.on('error', reject);
+        child.on('close', (code) => {
+            if (code === 0) resolve(stdout);
+            else reject(new ProcessError(`${bin} exited with code ${code}`, stderr));
+        });
+    });
+}
+
+export async function runYtDlpJson(args: string[], signal?: AbortSignal): Promise<Record<string, unknown>> {
+    const output = await spawnCapture(YTDLP_BIN, args, signal);
+    try {
+        return JSON.parse(output) as Record<string, unknown>;
+    } catch {
+        throw new ProcessError('yt-dlp returned invalid JSON.', output);
+    }
 }
 
 function permanentReason(err: unknown): string | null {
@@ -240,6 +280,7 @@ export async function downloadTrack(
     baseDir: string,
     log?: Logger,
     signal?: AbortSignal,
+    options: YtDlpDownloadOptions = {},
 ): Promise<string> {
     const out = log ?? ((s: string) => console.log(s));
     const dir = targetDir(baseDir, meta);
@@ -257,7 +298,12 @@ export async function downloadTrack(
     out(`[DOWNLOADING] ${meta.artists.join(', ')} - ${meta.album} - ${meta.title}`);
     try {
         await withRetry(
-            () => spawnP(YTDLP_BIN, buildYtDlpArgs(query, join(dir, name).replace(/%/g, '%%') + '.%(ext)s'), log, signal),
+            () => spawnP(
+                YTDLP_BIN,
+                buildYtDlpArgs(query, join(dir, name).replace(/%/g, '%%') + '.%(ext)s', options),
+                log,
+                signal,
+            ),
             'YouTube 403/network',
             log,
             signal,

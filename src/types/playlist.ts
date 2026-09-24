@@ -1,4 +1,4 @@
-import { Track } from "@/src/types/track";
+import { ResolvedTrack, Track } from "@/src/types/track";
 
 export interface PlaylistMeta {
     name: string;
@@ -8,4 +8,9 @@ export interface PlaylistMeta {
 
 export interface PlaylistEntry {
     item: Track | null;
+}
+
+export interface ResolvedCollection {
+    name: string;
+    tracks: ResolvedTrack[];
 }

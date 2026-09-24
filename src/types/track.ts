@@ -15,6 +15,12 @@ export interface TrackMeta {
     album: string;
 }
 
+export interface ResolvedTrack {
+    meta: TrackMeta;
+    /** Direct media page URL, when the source provider already resolved one. */
+    sourceUrl?: string;
+}
+
 export interface ItemsPage {
     items: PlaylistEntry[];
     next: string | null;

@@ -1,6 +1,6 @@
 # What is Steam2Player?
 
-A desktop application that allows you to download music from Spotify playlists to your local machine. It uses the youtube-dl-exec library to download the music, and the ffmpeg-static library to convert the audio to mp3.
+A desktop application that allows you to download music from Spotify or YouTube playlists and tracks to your local machine. It uses the youtube-dl-exec library to download the music, and the ffmpeg-static library to convert the audio to mp3.
 
 ![Preview](public//imgs/preview.png)
 
@@ -31,13 +31,12 @@ This app needs Spotify API credentials to read playlist data.
 
 ![Preview](public//imgs/spotify-dev-guide.png)
 
-## 3. Get a playlist ID
+## 3. Get a playlist or track ID
 
-You need the Spotify playlist ID to download tracks from a playlist.
+You need a Spotify playlist or track ID to download from Spotify.
 
-1. Open the Spotify playlist in Browser
-2. Copy the playlist ID
-3. The playlist ID is the part after `/playlist/`
+1. Open the Spotify playlist or track in a browser
+2. Copy its ID, or copy its full Spotify URL
 
 Example:
 
@@ -45,14 +44,18 @@ URL: `https://open.spotify.com/playlist/37i9dQZF1DXcBWIGoYBM5M`
 
 Playlist ID: `37i9dQZF1DXcBWIGoYBM5M`
 
+## YouTube downloads
+
+Switch the source toggle to YouTube and paste a public YouTube video URL or playlist URL. The app detects whether the URL is a playlist or a single video automatically.
+
 ## 4. Start the app
 
 1. Launch the app
-2. Paste the Playlist ID
-3. Paste your Spotify Client ID
-4. Paste your Spotify Client Secret
-6. Choose a folder for the downloaded music
-7. Click Start
+2. Choose Spotify or YouTube
+3. Paste the matching playlist/track ID or URL
+4. Fill in Spotify credentials when Spotify is selected
+5. Choose a folder for the downloaded music
+6. Click Start
 
 # Build from source
 
