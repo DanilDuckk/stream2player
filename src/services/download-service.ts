@@ -23,7 +23,7 @@ export async function runDownload(
     { cacheDir, signal, log, progress }: DownloadServiceOptions,
 ): Promise<{ ok: boolean; stopped: boolean }> {
     if (!config.input.trim()) {
-        log(`[ERROR] Please enter a ${config.isPlaylist ? 'playlist' : 'track'} URL or ID.`);
+        log('[ERROR] Please enter a playlist or track URL/ID.');
         return { ok: false, stopped: false };
     }
 
@@ -38,10 +38,10 @@ export async function runDownload(
             clientSecret: config.clientSecret as string,
             input: config.input,
             cacheDir,
-        }, log).getTracks(config.isPlaylist)
+        }, log).getTracks()
         : await createYoutubeSource({
             input: config.input,
-        }, log).getTracks(config.isPlaylist, signal);
+        }, log).getTracks(signal);
 
     log(`[INFO] ${sourceName(config.source)} collection "${collection.name}" — `
         + `${collection.tracks.length} tracks. Starting download...`);

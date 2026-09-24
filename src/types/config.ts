@@ -10,7 +10,6 @@ export type DownloadSource = 'spotify' | 'youtube';
 
 export interface DownloadConfig {
   source: DownloadSource;
-  isPlaylist: boolean;
   input: string;
   clientId?: string;
   clientSecret?: string;

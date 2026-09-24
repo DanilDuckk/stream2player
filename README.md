@@ -46,17 +46,16 @@ Playlist ID: `37i9dQZF1DXcBWIGoYBM5M`
 
 ## YouTube downloads
 
-Switch the source toggle to YouTube and paste a public YouTube video URL or playlist URL. Leave `Is Playlist` enabled for a playlist, or disable it for one video.
+Switch the source toggle to YouTube and paste a public YouTube video URL or playlist URL. The app detects whether the URL is a playlist or a single video automatically.
 
 ## 4. Start the app
 
 1. Launch the app
 2. Choose Spotify or YouTube
-3. Choose Playlist or Track with `Is Playlist`
-4. Paste the matching ID or URL
-5. Fill in Spotify credentials when Spotify is selected
-6. Choose a folder for the downloaded music
-7. Click Start
+3. Paste the matching playlist/track ID or URL
+4. Fill in Spotify credentials when Spotify is selected
+5. Choose a folder for the downloaded music
+6. Click Start
 
 # Build from source
 

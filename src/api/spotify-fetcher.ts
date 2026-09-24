@@ -136,6 +136,18 @@ export function createSpotify(cfg: SpotifyConfig, log: Logger = console.log) {
     return value.split('?')[0].trim();
   }
 
+  function detectInputKind(input: string): 'playlist' | 'track' | null {
+    try {
+      const url = new URL(input.trim());
+      const parts = url.pathname.split('/').filter(Boolean);
+      if (parts.includes('playlist')) return 'playlist';
+      if (parts.includes('track')) return 'track';
+    } catch {
+      // Raw Spotify IDs do not encode whether they belong to a playlist or track.
+    }
+    return null;
+  }
+
   async function fetchTrack(token: string, trackId: string): Promise<Track> {
     const response = await fetch(`${API_BASE}/tracks/${encodeURIComponent(trackId)}`, {
       headers: { Authorization: `Bearer ${token}` },
@@ -154,21 +166,36 @@ export function createSpotify(cfg: SpotifyConfig, log: Logger = console.log) {
     };
   }
 
+  async function getPlaylistTracks(token: string): Promise<ResolvedCollection> {
+    const { info, items } = await fetchPlaylist(token, extractId(cfg.input, 'playlist'));
+    return {
+      name: info.name,
+      tracks: items
+        .filter((entry) => entry.item)
+        .map((entry) => toResolvedTrack(entry.item as Track)),
+    };
+  }
+
   return {
-    async getTracks(isPlaylist: boolean): Promise<ResolvedCollection> {
+    async getTracks(): Promise<ResolvedCollection> {
       const token = await authorize();
-      if (!isPlaylist) {
+      const inputKind = detectInputKind(cfg.input);
+      if (inputKind === 'track') {
         const track = await fetchTrack(token, extractId(cfg.input, 'track'));
         return { name: track.name, tracks: [toResolvedTrack(track)] };
       }
 
-      const { info, items } = await fetchPlaylist(token, extractId(cfg.input, 'playlist'));
-      return {
-        name: info.name,
-        tracks: items
-          .filter((entry) => entry.item)
-          .map((entry) => toResolvedTrack(entry.item as Track)),
-      };
+      if (inputKind === 'playlist') return getPlaylistTracks(token);
+
+      try {
+        return await getPlaylistTracks(token);
+      } catch (error) {
+        if (!(error instanceof Error) || !/Playlist error (400|404)/.test(error.message)) {
+          throw error;
+        }
+        const track = await fetchTrack(token, extractId(cfg.input, 'track'));
+        return { name: track.name, tracks: [toResolvedTrack(track)] };
+      }
     },
   };
 }

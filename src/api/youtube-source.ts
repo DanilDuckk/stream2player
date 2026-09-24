@@ -60,14 +60,24 @@ function playlistEntries(data: Record<string, unknown>): YtDlpEntry[] {
     return Array.isArray(data.entries) ? data.entries.map(asEntry) : [];
 }
 
+function isPlaylistUrl(input: string): boolean {
+    try {
+        const url = new URL(input);
+        return url.pathname.split('/').includes('playlist') && Boolean(url.searchParams.get('list'));
+    } catch {
+        return false;
+    }
+}
+
 export function createYoutubeSource(
     cfg: YoutubeSourceConfig,
     log: Logger = console.log,
 ) {
     return {
-        async getTracks(isPlaylist: boolean, signal?: AbortSignal): Promise<ResolvedCollection> {
+        async getTracks(signal?: AbortSignal): Promise<ResolvedCollection> {
             const input = cfg.input.trim();
             if (!input) throw new Error('YouTube URL is required.');
+            const isPlaylist = isPlaylistUrl(input);
 
             log(`[INFO] Fetching ${isPlaylist ? 'playlist' : 'track'} from YouTube...`);
             const data = await runYtDlpJson(

@@ -165,11 +165,6 @@
       box-shadow: 0 0 0 2px rgba(255, 214, 0, 0.16), 0 0 18px rgba(255, 214, 0, 0.10);
     }
 
-    input[type="checkbox"] {
-      width: auto;
-      accent-color: var(--primary);
-    }
-
     input::placeholder {
       color: #6f675a;
     }
@@ -218,16 +213,6 @@
       background: var(--primary);
       color: #111111;
       box-shadow: 0 0 12px var(--glow);
-    }
-
-    .check-row {
-      display: flex;
-      align-items: center;
-      gap: 8px;
-      margin-top: 12px;
-      color: var(--text);
-      cursor: pointer;
-      letter-spacing: 0;
     }
 
     [hidden] {
@@ -393,13 +378,8 @@
         <button id="youtubeSource" type="button" aria-pressed="false">YouTube</button>
       </div>
 
-      <label class="check-row" for="isPlaylist">
-        <input id="isPlaylist" type="checkbox" checked />
-        <span>Is Playlist</span>
-      </label>
-
-      <label id="sourceInputLabel">PLAYLIST ID OR URL</label>
-      <input id="sourceInput" placeholder="e.g. 3pdwsDnzLp6Uks4dUutxp8" />
+      <label id="sourceInputLabel">PLAYLIST OR TRACK ID / URL</label>
+      <input id="sourceInput" placeholder="e.g. Spotify playlist or track ID / URL" />
 
       <div id="spotifyOptions">
         <label>CLIENT_ID</label>
@@ -484,12 +464,38 @@
       $('mute').setAttribute('aria-label', $('mute').title);
     };
 
+    function detectInputKind() {
+      const value = $('sourceInput').value.trim();
+      if (!value) return null;
+
+      try {
+        const url = new URL(value);
+        const parts = url.pathname.split('/').filter(Boolean);
+        if (source === 'spotify') {
+          if (parts.includes('playlist')) return 'playlist';
+          if (parts.includes('track')) return 'track';
+        } else if (parts.includes('playlist') && url.searchParams.has('list')) {
+          return 'playlist';
+        } else if (parts.includes('watch') || url.hostname === 'youtu.be') {
+          return 'track';
+        }
+      } catch {
+        // Raw Spotify IDs are resolved by the Spotify API.
+      }
+      return null;
+    }
+
     function updateInputMode() {
-      const playlist = $('isPlaylist').checked;
-      $('sourceInputLabel').textContent = `${playlist ? 'PLAYLIST' : 'TRACK'} ${source === 'spotify' ? 'ID OR URL' : 'URL'}`;
-      $('sourceInput').placeholder = source === 'spotify'
-        ? (playlist ? 'e.g. 3pdwsDnzLp6Uks4dUutxp8' : 'e.g. Spotify track ID or URL')
-        : (playlist ? 'e.g. https://www.youtube.com/playlist?list=...' : 'e.g. https://www.youtube.com/watch?v=...');
+      const kind = detectInputKind();
+      const kindLabel = kind ? kind.toUpperCase() : 'PLAYLIST OR TRACK';
+      $('sourceInputLabel').textContent = `${kindLabel} ${source === 'spotify' ? 'ID OR URL' : 'URL'}`;
+      $('sourceInput').placeholder = kind
+        ? (source === 'spotify'
+          ? `e.g. ${kind === 'playlist' ? 'Spotify playlist' : 'Spotify track'} ID or URL`
+          : `e.g. https://www.youtube.com/${kind === 'playlist' ? 'playlist?list=...' : 'watch?v=...'}`)
+        : (source === 'spotify'
+          ? 'e.g. Spotify playlist or track ID / URL'
+          : 'e.g. public YouTube playlist or video URL');
       $('spotifyOptions').hidden = source !== 'spotify';
       $('spotifySource').classList.toggle('active', source === 'spotify');
       $('youtubeSource').classList.toggle('active', source === 'youtube');
@@ -500,7 +506,7 @@
 
     $('spotifySource').onclick = () => { source = 'spotify'; updateInputMode(); };
     $('youtubeSource').onclick = () => { source = 'youtube'; updateInputMode(); };
-    $('isPlaylist').onchange = updateInputMode;
+    $('sourceInput').oninput = updateInputMode;
     window.addEventListener('load', scheduleWindowResize);
     updateInputMode();
 
@@ -529,7 +535,6 @@
       try {
         await window.api.startDownload({
           source,
-          isPlaylist: $('isPlaylist').checked,
           input: $('sourceInput').value.trim(),
           clientId: source === 'spotify' ? $('clientId').value.trim() : undefined,
           clientSecret: source === 'spotify' ? $('clientSecret').value.trim() : undefined,
