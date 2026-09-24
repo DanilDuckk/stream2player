@@ -4,8 +4,8 @@ import { exec } from 'node:child_process';
 import { readFileSync, writeFileSync, existsSync } from 'node:fs';
 import { join } from 'node:path';
 import { SpotifyConfig } from '@/src/types/config';
-import { ItemsPage } from '@/src/types/track';
-import { PlaylistMeta, PlaylistEntry } from '@/src/types/playlist';
+import { ItemsPage, ResolvedTrack, Track } from '@/src/types/track';
+import { PlaylistMeta, PlaylistEntry, ResolvedCollection } from '@/src/types/playlist';
 
 const AUTH_URL = 'https://accounts.spotify.com/authorize';
 const TOKEN_URL = 'https://accounts.spotify.com/api/token';
@@ -96,10 +96,10 @@ export function createSpotify(cfg: SpotifyConfig, log: Logger = console.log) {
     return data.access_token;
   }
 
-  async function fetchPlaylist(token: string): Promise<{ info: PlaylistMeta; items: PlaylistEntry[] }> {
+  async function fetchPlaylist(token: string, playlistId: string): Promise<{ info: PlaylistMeta; items: PlaylistEntry[] }> {
     const headers = { Authorization: `Bearer ${token}` };
     const metaFields = encodeURIComponent('name,owner(display_name),items(total)');
-    const metaResp = await fetch(`${API_BASE}/playlists/${cfg.playlistId}?fields=${metaFields}`, { headers });
+    const metaResp = await fetch(`${API_BASE}/playlists/${playlistId}?fields=${metaFields}`, { headers });
 
     if (!metaResp.ok) throw new Error(`Playlist error ${metaResp.status}: ${await metaResp.text()}`);
    
@@ -107,7 +107,7 @@ export function createSpotify(cfg: SpotifyConfig, log: Logger = console.log) {
     const items: PlaylistEntry[] = [];
     const itemFields = encodeURIComponent('items(item(name,artists(name),album(name,release_date,images),external_urls(spotify))),next');
     
-    let url: string | null = `${API_BASE}/playlists/${cfg.playlistId}/items?limit=100&fields=${itemFields}`;
+    let url: string | null = `${API_BASE}/playlists/${playlistId}/items?limit=100&fields=${itemFields}`;
     
     while (url) {
       const resp: Response = await fetch(url, { headers });
@@ -120,10 +120,55 @@ export function createSpotify(cfg: SpotifyConfig, log: Logger = console.log) {
     return { info, items };
   }
 
+  function extractId(input: string, kind: 'playlist' | 'track'): string {
+    const value = input.trim();
+    if (!value) throw new Error(`Spotify ${kind} is required.`);
+
+    try {
+      const url = new URL(value);
+      const parts = url.pathname.split('/').filter(Boolean);
+      const typeIndex = parts.indexOf(kind);
+      if (typeIndex >= 0 && parts[typeIndex + 1]) return parts[typeIndex + 1];
+    } catch {
+      // Treat a non-URL value as a raw Spotify ID below.
+    }
+
+    return value.split('?')[0].trim();
+  }
+
+  async function fetchTrack(token: string, trackId: string): Promise<Track> {
+    const response = await fetch(`${API_BASE}/tracks/${encodeURIComponent(trackId)}`, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    if (!response.ok) throw new Error(`Track error ${response.status}: ${await response.text()}`);
+    return (await response.json()) as Track;
+  }
+
+  function toResolvedTrack(track: Track): ResolvedTrack {
+    return {
+      meta: {
+        title: track.name,
+        artists: track.artists.map((artist) => artist.name),
+        album: track.album.name,
+      },
+    };
+  }
+
   return {
-    async getPlaylistTracks() {
+    async getTracks(isPlaylist: boolean): Promise<ResolvedCollection> {
       const token = await authorize();
-      return fetchPlaylist(token);
+      if (!isPlaylist) {
+        const track = await fetchTrack(token, extractId(cfg.input, 'track'));
+        return { name: track.name, tracks: [toResolvedTrack(track)] };
+      }
+
+      const { info, items } = await fetchPlaylist(token, extractId(cfg.input, 'playlist'));
+      return {
+        name: info.name,
+        tracks: items
+          .filter((entry) => entry.item)
+          .map((entry) => toResolvedTrack(entry.item as Track)),
+      };
     },
   };
 }

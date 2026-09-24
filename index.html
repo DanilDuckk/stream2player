@@ -165,6 +165,11 @@
       box-shadow: 0 0 0 2px rgba(255, 214, 0, 0.16), 0 0 18px rgba(255, 214, 0, 0.10);
     }
 
+    input[type="checkbox"] {
+      width: auto;
+      accent-color: var(--primary);
+    }
+
     input::placeholder {
       color: #6f675a;
     }
@@ -176,7 +181,7 @@
     .row {
       display: flex;
       gap: 8px;
-      margin: 12px 0 4px;
+      margin: 0px 0 4px;
 
       align-items: center;
     }
@@ -187,6 +192,46 @@
 
     .section {
       width: 400px;
+    }
+
+    .toggle-group {
+      display: flex;
+      gap: 4px;
+      padding: 4px;
+      border: 1px solid var(--border);
+      border-radius: 5px;
+      background: var(--surface);
+    }
+
+    .toggle-group button {
+      flex: 1;
+      padding: 7px 10px;
+      border: 0;
+      border-radius: 3px;
+      background: transparent;
+      color: var(--muted);
+      cursor: pointer;
+      font-weight: 700;
+    }
+
+    .toggle-group button.active {
+      background: var(--primary);
+      color: #111111;
+      box-shadow: 0 0 12px var(--glow);
+    }
+
+    .check-row {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin-top: 12px;
+      color: var(--text);
+      cursor: pointer;
+      letter-spacing: 0;
+    }
+
+    [hidden] {
+      display: none !important;
     }
 
     .container {
@@ -338,24 +383,39 @@
 <body>
   <header class="header">
     <h1>STREAM2PLAYER ♫</h1>
-    <button id="mute" class="secondary" title="Mute music">||</button>
+    <button id="mute" class="secondary" title="Mute" aria-label="Mute">▷</button>
   </header>
   <div class="container">
     <section class="section">
-      <label>PLAYLIST_ID</label>
-      <input id="playlistId" placeholder="e.g. 3pdwsDnzLp6Uks4dUutxp8" />
+      <label>DOWNLOAD FROM</label>
+      <div class="toggle-group" role="group" aria-label="Download source">
+        <button id="spotifySource" class="active" type="button" aria-pressed="true">Spotify</button>
+        <button id="youtubeSource" type="button" aria-pressed="false">YouTube</button>
+      </div>
 
-      <label>CLIENT_ID</label>
-      <input id="clientId" />
+      <label class="check-row" for="isPlaylist">
+        <input id="isPlaylist" type="checkbox" checked />
+        <span>Is Playlist</span>
+      </label>
 
-      <label>CLIENT_SECRET</label>
-      <input id="clientSecret" type="password" />
+      <label id="sourceInputLabel">PLAYLIST ID OR URL</label>
+      <input id="sourceInput" placeholder="e.g. 3pdwsDnzLp6Uks4dUutxp8" />
+
+      <div id="spotifyOptions">
+        <label>CLIENT_ID</label>
+        <input id="clientId" />
+
+        <label>CLIENT_SECRET</label>
+        <input id="clientSecret" type="password" />
+      </div>
 
       <label>DOWNLOAD FOLDER</label>
       <div class="row">
         <input id="downloadDir" placeholder="No folder selected" readonly />
         <button id="choose" class="secondary">Choose</button>
       </div>
+
+      <div style="margin-top: 12px"></div>
 
       <div class="row">
         <button id="start" class="primary">Start</button>
@@ -371,6 +431,22 @@
   <script>
     const $ = (id) => document.getElementById(id);
     const logEl = $('log');
+    let source = 'spotify';
+
+    function resizeWindowToContent() {
+      const contentBottom = Array.from(document.body.children).reduce(
+        (bottom, element) => Math.max(bottom, element.getBoundingClientRect().bottom),
+        0,
+      );
+      const bodyStyle = getComputedStyle(document.body);
+      const height = contentBottom + parseFloat(bodyStyle.paddingBottom || '0');
+      window.api.resizeWindow(height);
+    }
+
+    function scheduleWindowResize() {
+      requestAnimationFrame(resizeWindowToContent);
+      setTimeout(resizeWindowToContent, 100);
+    }
 
     function addLog(line) {
       logEl.textContent += line + '\n';
@@ -402,10 +478,31 @@
 
     $('mute').onclick = () => {
       bgm.muted = !bgm.muted;
-      $('mute').textContent = bgm.muted ? '▷' : '||';
+      $('mute').textContent = bgm.muted ? '||' : '▷';
       $('mute').classList.toggle('off', bgm.muted);
-      $('mute').title = bgm.muted ? 'Unmute music' : 'Mute music';
+      $('mute').title = bgm.muted ? 'Unmute' : 'Mute';
+      $('mute').setAttribute('aria-label', $('mute').title);
     };
+
+    function updateInputMode() {
+      const playlist = $('isPlaylist').checked;
+      $('sourceInputLabel').textContent = `${playlist ? 'PLAYLIST' : 'TRACK'} ${source === 'spotify' ? 'ID OR URL' : 'URL'}`;
+      $('sourceInput').placeholder = source === 'spotify'
+        ? (playlist ? 'e.g. 3pdwsDnzLp6Uks4dUutxp8' : 'e.g. Spotify track ID or URL')
+        : (playlist ? 'e.g. https://www.youtube.com/playlist?list=...' : 'e.g. https://www.youtube.com/watch?v=...');
+      $('spotifyOptions').hidden = source !== 'spotify';
+      $('spotifySource').classList.toggle('active', source === 'spotify');
+      $('youtubeSource').classList.toggle('active', source === 'youtube');
+      $('spotifySource').setAttribute('aria-pressed', String(source === 'spotify'));
+      $('youtubeSource').setAttribute('aria-pressed', String(source === 'youtube'));
+      scheduleWindowResize();
+    }
+
+    $('spotifySource').onclick = () => { source = 'spotify'; updateInputMode(); };
+    $('youtubeSource').onclick = () => { source = 'youtube'; updateInputMode(); };
+    $('isPlaylist').onchange = updateInputMode;
+    window.addEventListener('load', scheduleWindowResize);
+    updateInputMode();
 
     window.api.onLog(addLog);
     window.api.onProgress((p) => {
@@ -431,9 +528,11 @@
       playBgm();
       try {
         await window.api.startDownload({
-          playlistId: $('playlistId').value.trim(),
-          clientId: $('clientId').value.trim(),
-          clientSecret: $('clientSecret').value.trim(),
+          source,
+          isPlaylist: $('isPlaylist').checked,
+          input: $('sourceInput').value.trim(),
+          clientId: source === 'spotify' ? $('clientId').value.trim() : undefined,
+          clientSecret: source === 'spotify' ? $('clientSecret').value.trim() : undefined,
           downloadDir: $('downloadDir').value.trim(),
         });
       } finally {

@@ -3,6 +3,7 @@ import { contextBridge, ipcRenderer } from 'electron';
 contextBridge.exposeInMainWorld('api', {
   startDownload: (config: unknown) => ipcRenderer.invoke('start-download', config),
   stop: () => ipcRenderer.invoke('stop-download'),
+  resizeWindow: (height: number) => ipcRenderer.invoke('resize-window', height),
   chooseFolder: (): Promise<string | null> => ipcRenderer.invoke('choose-folder'),
   onLog: (cb: (line: string) => void) =>
     ipcRenderer.on('log', (_e, line: string) => cb(line)),

@@ -1,14 +1,18 @@
 export interface SpotifyConfig {
   clientId: string;
   clientSecret: string;
-  playlistId: string;
+  input: string;
   cacheDir: string;
   redirectUri?: string;
 }
 
+export type DownloadSource = 'spotify' | 'youtube';
+
 export interface DownloadConfig {
-  playlistId: string;
-  clientId: string;
-  clientSecret: string;
+  source: DownloadSource;
+  isPlaylist: boolean;
+  input: string;
+  clientId?: string;
+  clientSecret?: string;
   downloadDir: string;
 }
